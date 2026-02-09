@@ -110,7 +110,7 @@ const Navigation = ({
           
           <div className="absolute top-full right-0 mt-1 w-48 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all z-[100] backdrop-blur-xl">
             <ExerciseItem 
-              onClick={() => startEarTraining(setMode)} 
+              onClick={() => {stopDetection();startEarTraining(setMode);}} 
               icon={<Volume2 size={14}/>} 
               title="盲听练习" 
               desc="听音辩位训练" 

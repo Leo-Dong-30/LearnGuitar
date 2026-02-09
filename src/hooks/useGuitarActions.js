@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { audioEngine } from '../services/audioEngine';
 import { exerciseEngine } from '../services/exerciseEngine';
+import { STRINGS, NOTES } from '../constants/musicConfig';
 
 /**
  * useGuitarActions - 自定义 Hook：管理吉他交互行为与练习逻辑
@@ -16,6 +17,8 @@ export const useGuitarActions = (mode, theoryPositions) => {
   const [exerciseType, setExerciseType] = useState(null);       // 当前练习子类型 (如 'ear-training')
   const [exerciseScore, setExerciseScore] = useState({ total: 0, correct: 0 }); // 成绩统计
   const [lastFeedback, setLastFeedback] = useState(null);      // 交互反馈：'correct' | 'wrong'
+  const [attempts, setAttempts] = useState(0); // 新增：记录当前题目的尝试次数
+  const currentQuestionRef = useRef(null); // 新增：持久化引用当前题目坐标
 
   /**
    * 辅助函数：进入下一题
@@ -23,7 +26,9 @@ export const useGuitarActions = (mode, theoryPositions) => {
    */
   const nextQuestion = useCallback(() => {
     setLastFeedback(null);
+    setAttempts(0); // 切换题目时重置尝试次数
     const q = exerciseEngine.generateQuestion(theoryPositions);
+    currentQuestionRef.current = q; // 更新当前题目引用
     
     // 延迟播放：确保用户在视觉上感知到反馈结束后，再开始听觉测试
     setTimeout(() => {
@@ -39,9 +44,11 @@ export const useGuitarActions = (mode, theoryPositions) => {
     setAppMode('practice');
     setExerciseType('ear-training');
     setExerciseScore({ total: 0, correct: 0 });
+    setAttempts(0); // 初始化尝试次数
     
     setLastFeedback(null);
     const q = exerciseEngine.generateQuestion(theoryPositions);
+    currentQuestionRef.current = q; // 记录首题坐标
     setTimeout(() => {
       audioEngine.play(q.sIdx, q.fIdx);
     }, 500);
@@ -64,25 +71,55 @@ export const useGuitarActions = (mode, theoryPositions) => {
     // --- 练习模式判定分支 ---
     if (mode === 'practice' && exerciseType === 'ear-training') {
       // 校验答案：由 exerciseEngine 执行逻辑判断
-      const isCorrect = exerciseEngine.checkAnswer(sIdx, fIdx);
+      const isCorrect = exerciseEngine.checkAnswer(sIdx, fIdx, STRINGS, NOTES);
       
-      // 更新即时反馈视觉状态
-      setLastFeedback(isCorrect ? 'correct' : 'wrong');
-      
-      // 更新成绩累计
-      setExerciseScore(prev => ({
-        total: prev.total + 1,
-        correct: isCorrect ? prev.correct + 1 : prev.correct
-      }));
-      
-      // 节奏控制：用户操作后等待 1.5s 自动进入下一题，保持练习连贯性
-      setTimeout(nextQuestion, 1500);
+      if (isCorrect) {
+        // --- 答对了：计分并直接进入下一题 ---
+        setLastFeedback('correct');
+        setExerciseScore(prev => ({
+          total: prev.total + 1,
+          correct: prev.correct + 1
+        }));
+        setTimeout(nextQuestion, 1500);
+      } else {
+        // --- 答错了 ---
+        if (attempts === 0) {
+          // 第一次错误：不计分，给出反馈并重播题目音讯
+          setLastFeedback('wrong');
+          setAttempts(1);
+          
+          setTimeout(() => {
+            // 暂时清除错误视觉反馈，并重新播报题目
+            setLastFeedback(null);
+            if (currentQuestionRef.current) {
+              audioEngine.play(currentQuestionRef.current.sIdx, currentQuestionRef.current.fIdx);
+            }
+          }, 1000);
+        } else {
+          // 第二次错误：计分(错误)，播放正确答案，随后进入下一题
+          setLastFeedback('wrong');
+          setExerciseScore(prev => ({
+            ...prev,
+            total: prev.total + 1
+          }));
+
+          // 播放正确答案的声音以强化记忆
+          if (currentQuestionRef.current) {
+            setTimeout(() => {
+              audioEngine.play(currentQuestionRef.current.sIdx, currentQuestionRef.current.fIdx);
+            }, 600);
+          }
+          
+          // 给用户更多时间记忆正确答案（3.5秒后切题）
+          setTimeout(nextQuestion, 3500);
+        }
+      }
       return note;
     }
 
     // 自由探索模式下，直接返回音名
     return note;
-  }, [mode, exerciseType, nextQuestion]);
+  }, [mode, exerciseType, attempts, nextQuestion]);
 
   // 对外暴露的状态与控制方法
   return {
@@ -92,6 +129,7 @@ export const useGuitarActions = (mode, theoryPositions) => {
     setExerciseScore,
     lastFeedback,
     setLastFeedback,
+    attempts, // 导出尝试次数供 App.jsx 使用
     playNote,
     startEarTraining,
     nextQuestion

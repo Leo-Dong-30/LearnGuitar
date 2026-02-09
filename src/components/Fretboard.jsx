@@ -13,68 +13,68 @@ import { STRINGS, FRET_COUNT, NOTES } from '../constants/musicConfig';
  * 3. 弦线层：粗细不一的琴弦视觉线条。
  * 4. 交互音符层：可点击的透明热区及动态音符 UI（Active/Guide 状态）。
  * * @param {Function} onNotePlay - 点击品格的回调函数 (stringIdx, fretIdx) => void
- * @param {Array} activePositions - 当前激活/发声的位置列表 [{s: 弦索引, f: 品索引}]
+ * @param {Array} activePositions - 当前激活/发声的位置列表 [{s: 弦索引, f: 品索引, isCorrectHint: 布尔值}]
  * @param {Array} guidePositions - 乐理引擎生成的提示位置列表 [{s, f, interval, isRoot}]
  */
+
 const Fretboard = ({ onNotePlay, activePositions = [], guidePositions = [] }) => {
   // 0 品（琴枕）占据指板总宽度的百分比
   const NUT_WIDTH_PERCENT = 5; 
 
   return (
     <div className="w-full py-10 px-2 select-none">
-      {/* --- 指板主体容器：处理渐变背景与圆角阴影 --- */}
-      <div className="relative w-full h-48 md:h-64 bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] rounded-xl border-y-2 border-gray-800 shadow-2xl flex flex-col justify-between py-1 overflow-hidden">
+      {/* --- 指板主体容器：极简深色背景与微边框 --- */}
+      <div className="relative w-full h-48 md:h-64 bg-[#121212] rounded-xl border border-white/5 shadow-xl flex flex-col justify-between py-1 overflow-hidden">
         
-        {/* --- 1. 背景层：绘制琴枕、品丝与品位装饰点 --- */}
+        {/* --- 1. 背景层：品丝与微型装饰点 --- */}
         <div className="absolute inset-0 flex">
           {/* 琴枕 (Nut) */}
           <div 
             style={{ width: `${NUT_WIDTH_PERCENT}%` }} 
-            className="h-full border-r-[3px] border-amber-500/80 bg-black/40 relative"
+            className="h-full border-r-2 border-amber-600/60 bg-white/5 relative"
           >
-            <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 text-[9px] text-amber-600 font-bold tracking-tighter">NUT</span>
+            <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] text-amber-700 font-medium tracking-widest opacity-80">NUT</span>
           </div>
           
           {/* 品格格栅与数字标注 */}
           {Array.from({ length: FRET_COUNT }).map((_, i) => (
-            <div key={i + 1} className="flex-1 h-full border-r border-white/10 relative">
+            <div key={i + 1} className="flex-1 h-full border-r border-white/5 relative">
               {/* 品数编号 (1, 2, 3...) */}
-              <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 text-[9px] text-gray-600 font-mono">{i + 1}</span>
+              <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] text-gray-700 font-mono tracking-tighter">{i + 1}</span>
               
-              {/* 品位装饰点 (Inlays)：常规品位显示单点，12品显示双点 */}
+              {/* 品位装饰点 (Inlays)：改为极小实心点 */}
               {[3, 5, 7, 9, 12, 15].includes(i + 1) && (
-                <div className={`absolute left-1/2 -translate-x-1/2 w-1.5 h-1.5 md:w-2 md:h-2 bg-white/5 rounded-full ring-1 ring-white/5 ${i + 1 === 12 ? 'top-[33%] mb-4' : 'top-1/2 -translate-y-1/2'}`} />
+                <div className={`absolute left-1/2 -translate-x-1/2 w-1 h-1 bg-white/10 rounded-full ${i + 1 === 12 ? 'top-[33%] mb-4' : 'top-1/2 -translate-y-1/2'}`} />
               )}
               {i + 1 === 12 && (
-                <div className="absolute top-[66%] left-1/2 -translate-x-1/2 w-1.5 h-1.5 md:w-2 md:h-2 bg-white/5 rounded-full ring-1 ring-white/5" />
+                <div className="absolute top-[66%] left-1/2 -translate-x-1/2 w-1 h-1 bg-white/10 rounded-full" />
               )}
             </div>
           ))}
         </div>
 
-        {/* --- 2. 交互层：琴弦绘制与音符交互单元格 --- */}
+        {/* --- 2. 交互层：极细琴弦与音符交互单元格 --- */}
         <div className="absolute inset-0 flex flex-col justify-between py-3 z-10">
           {STRINGS.map((string, sIdx) => (
             <div key={sIdx} className="relative w-full h-[14%] flex items-center group">
               
-              {/* 琴弦线条：根据弦号 (sIdx) 动态增加高度，模拟从细到粗的视觉效果 */}
+              {/* 琴弦线条：改为高透明度的实线条，模拟极简质感 */}
               <div 
-                className="absolute w-full bg-gradient-to-r from-gray-600 via-gray-400 to-gray-700 shadow-[0_1px_1px_rgba(0,0,0,0.8)] pointer-events-none" 
-                style={{ height: `${0.5 + sIdx * 0.4}px` }} 
+                className="absolute w-full bg-white/10 pointer-events-none" 
+                style={{ height: `${0.5 + sIdx * 0.3}px` }} 
               />
               
               {/* 品格交互网格 (0品至最大品数) */}
               <div className="flex w-full h-full">
                 {Array.from({ length: FRET_COUNT + 1 }).map((_, fIdx) => {
-                  // A. 状态匹配：检查当前品格是否处于“激活”或“乐理引导”状态
                   const activeInfo = activePositions.find(p => p.s === sIdx && p.f === fIdx);
                   const guideInfo = guidePositions.find(p => p.s === sIdx && p.f === fIdx);
                   
-                  const isActive = !!activeInfo;      // 当前正在按/识别
-                  const isGuide = !!guideInfo;        // 属于当前选定的音阶/和弦
-                  const isRoot = guideInfo?.isRoot;   // 是否为根音
+                  const isActive = !!activeInfo;
+                  const isCorrectHint = activeInfo?.isCorrectHint;
+                  const isGuide = !!guideInfo;
+                  const isRoot = guideInfo?.isRoot;
 
-                  // B. 音名推算：根据弦根音与品数计算当前格子的音名
                   const noteIndex = (NOTES.indexOf(string.note) + fIdx) % 12;
                   const noteName = NOTES[noteIndex];
 
@@ -85,24 +85,25 @@ const Fretboard = ({ onNotePlay, activePositions = [], guidePositions = [] }) =>
                       style={{ width: fIdx === 0 ? `${NUT_WIDTH_PERCENT}%` : `${(100 - NUT_WIDTH_PERCENT) / FRET_COUNT}%` }}
                       className="h-full cursor-pointer flex items-center justify-center relative group/note"
                     >
-                      {/* C. 音符渲染逻辑：根据状态应用不同的视觉样式 (Active > Guide > Hidden) */}
+                      {/* C. 音符渲染逻辑：降低视觉对比度，强化扁平感 */}
                       <div className={`
-                        w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 rounded-full transition-all duration-300 flex items-center justify-center text-[8px] md:text-[10px] font-black z-20
-                        ${isActive 
-                          ? 'bg-blue-500 text-white scale-110 shadow-[0_0_15px_rgba(59,130,246,0.6)]' // 激活状态：蓝色发光
-                          : isGuide 
-                            ? isRoot
-                              ? 'bg-amber-500/20 text-amber-500 border-2 border-amber-500/80 shadow-[0_0_10px_rgba(245,158,11,0.3)]' // 根音：橙色边框
-                              : 'bg-white/5 text-gray-400 border border-white/20' // 引导音：低调白框
-                            : 'bg-black/10 text-transparent border border-white/5 group-hover/note:bg-white/10 group-hover/note:text-white/70'} // 隐藏状态：仅在 Hover 时显现
+                        w-6 h-6 sm:w-7 sm:h-7 md:w-9 md:h-9 rounded-full transition-all duration-200 flex items-center justify-center text-[9px] md:text-[11px] font-bold z-20
+                        ${isCorrectHint
+                          ? 'bg-green-600 text-white scale-110 shadow-lg shadow-green-900/40 animate-pulse' // 正确提示：稳定绿
+                          : isActive 
+                            ? 'bg-white text-black scale-105' // 激活：明亮对比
+                            : isGuide 
+                              ? isRoot
+                                ? 'bg-[#222] text-amber-500 border border-amber-600/40' // 根音：沉稳橙
+                                : 'bg-[#1a1a1a] text-gray-500 border border-white/5' // 引导：灰调
+                              : 'bg-transparent text-transparent group-hover/note:bg-white/5 group-hover/note:text-white/40'} 
                       `}>
-                        {/* 文字内容：引导模式下显示音程级数 (如 R, 3, 5)，播放/识别模式显示真实音名 (如 C, G) */}
                         {(isGuide && !isActive) ? guideInfo.interval : noteName}
                       </div>
 
-                      {/* D. 根音光晕：为乐理根音提供额外的背景模糊层以增加层次感 */}
-                      {isRoot && isGuide && !isActive && (
-                        <div className="absolute inset-0 bg-amber-500/5 blur-md rounded-full scale-150 pointer-events-none" />
+                      {/* D. 提示动画：移除背景模糊，改为简单的圆环 */}
+                      {isCorrectHint && (
+                        <div className="absolute inset-0 border-2 border-green-600/20 rounded-full scale-125 animate-ping pointer-events-none" />
                       )}
                     </div>
                   );

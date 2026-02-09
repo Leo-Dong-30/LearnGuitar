@@ -43,19 +43,29 @@ class ExerciseEngine {
   }
 
   /**
-   * 校验用户回答是否正确
-   * @param {number} userSIdx - 用户点击或弹奏的弦索引
-   * @param {number} userFIdx - 用户点击或弹奏的品索引
-   * @returns {boolean} - 是否命中目标坐标
+   * 结果校验：支持“同音异位”判定
+   * @param {number} userSIdx - 用户点击的弦
+   * @param {number} userFIdx - 用户点击的品
+   * @param {Array} stringsConfig - 注入 STRINGS 配置以计算音名
+   * @param {Array} notesConfig - 注入 NOTES 配置
+   * @returns {boolean}
    */
-  checkAnswer(userSIdx, userFIdx) {
+  checkAnswer(userSIdx, userFIdx, stringsConfig, notesConfig) {
     if (!this.currentQuestion) return false;
-    
-    // 物理坐标完全匹配判定
-    return (
-      this.currentQuestion.sIdx === userSIdx && 
-      this.currentQuestion.fIdx === userFIdx
-    );
+
+    const target = this.currentQuestion;
+
+    // 1. 获取目标位置的音名索引
+    // 计算公式：(起始弦音索引 + 品位) % 12
+    const targetStartNoteIdx = notesConfig.indexOf(stringsConfig[target.sIdx].note);
+    const targetNoteIdx = (targetStartNoteIdx + target.fIdx) % 12;
+
+    // 2. 获取用户点击位置的音名索引
+    const userStartNoteIdx = notesConfig.indexOf(stringsConfig[userSIdx].note);
+    const userNoteIdx = (userStartNoteIdx + userFIdx) % 12;
+
+    // 3. 核心判定：只要音名相同（12平均律中的位置相同），即视为正确
+    return targetNoteIdx === userNoteIdx;
   }
 }
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
 // 配置与常量
-import { KEYBOARD_MAP, FRETBOARD_FREQS } from './constants/musicConfig';
+import { KEYBOARD_MAP, FRETBOARD_FREQS, STRINGS, NOTES } from './constants/musicConfig'; // 增加导入 STRINGS, NOTES
 import { getTheoryPositions } from './services/theoryEngine'; 
 
 // UI 组件
@@ -16,6 +16,9 @@ import PracticeStats from './components/PracticeStats';
 import { useMetronome } from './hooks/useMetronome';
 import { usePitchDetection } from './hooks/usePitchDetection';
 import { useGuitarActions } from './hooks/useGuitarActions';
+
+// 引入练习引擎以获取当前题目目标
+import { exerciseEngine } from './services/exerciseEngine';
 
 export default function App() {
   const [mode, setMode] = useState('explore');
@@ -35,8 +38,8 @@ export default function App() {
   } = usePitchDetection();
   
   const { 
-    exerciseScore, lastFeedback, playNote, 
-    startEarTraining, setExerciseType 
+    exerciseScore, lastFeedback, attempts, // 引入 attempts 状态
+    playNote, startEarTraining, setExerciseType 
   } = useGuitarActions(mode, guidePositions);
 
   const { bpm, isMetronomePlaying, toggleMetronome, updateBpm } = useMetronome(100);
@@ -62,15 +65,44 @@ export default function App() {
 
   const handleFretClick = useCallback((sIdx, fIdx) => {
     const noteName = playNote(sIdx, fIdx);
+    setActiveNote(noteName);
+
     if (mode !== 'practice') {
-      setActiveNote(noteName);
+      // 探索模式逻辑
       setActivePositions([{ s: sIdx, f: fIdx }]);
       setTimeout(() => {
         setActiveNote(null);
         setActivePositions([]);
       }, 1500);
+    } else {
+      // --- 练习模式核心修复逻辑 ---
+      const currentPos = [{ s: sIdx, f: fIdx }];
+
+      // 实时校验当前点击是否正确
+      const isCorrect = exerciseEngine.checkAnswer(sIdx, fIdx, STRINGS, NOTES);
+
+      // 如果点击错误，且当前已经是第 2 次尝试 (attempts 为 1 表示这是第二次点击)
+      if (!isCorrect && attempts === 1) {
+        const target = exerciseEngine.currentQuestion;
+        if (target) {
+          // 将正确答案以“提示点”身份加入数组
+          currentPos.push({ 
+            s: target.sIdx, 
+            f: target.fIdx, 
+            isCorrectHint: true 
+          });
+        }
+      }
+
+      setActivePositions(currentPos);
+      
+      // 统一清理状态，时间稍长以确保用户看清纠正点
+      setTimeout(() => {
+        setActiveNote(null);
+        setActivePositions([]);
+      }, 3000);
     }
-  }, [mode, playNote, setActiveNote, setActivePositions]);
+  }, [mode, playNote, setActiveNote, setActivePositions, attempts]); // 移除了对异步 lastFeedback 的依赖
 
   const handleMouseDown = (e) => {
     const handle = e.target.closest('.drag-container');
@@ -131,7 +163,14 @@ return (
 
     <main className="pt-28 pb-12 flex flex-col items-center max-w-7xl mx-auto px-6 min-h-screen">
       
-      {/* 2. 练习状态看板：仅在 'practice' 模式下挂载，展示得分、正确率及辅助开关 */}
+
+      {/* 2. 配置交互面板：包含乐理选择 (Theory) 与 节拍器 (Metronome)*/}
+      <div className={`w-full grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-end transition-opacity duration-500 ${mode === 'practice' ? 'opacity-60' : 'opacity-100'}`}>
+        <TheorySelector theoryConfig={theoryConfig} setTheoryConfig={setTheoryConfig} />
+        <MetronomePanel bpm={bpm} isMetronomePlaying={isMetronomePlaying} toggleMetronome={toggleMetronome} updateBpm={updateBpm} />
+      </div>
+
+      {/* 3. 练习状态看板：仅在 'practice' 模式下挂载，展示得分、正确率及辅助开关 */}
       {mode === 'practice' && (
         <PracticeStats 
           exerciseScore={exerciseScore} 
@@ -139,12 +178,6 @@ return (
           setShowHints={setShowHints} 
         />
       )}
-
-      {/* 3. 配置交互面板：包含乐理选择 (Theory) 与 节拍器 (Metronome)*/}
-      <div className={`w-full grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-end transition-opacity duration-500 ${mode === 'practice' ? 'opacity-60' : 'opacity-100'}`}>
-        <TheorySelector theoryConfig={theoryConfig} setTheoryConfig={setTheoryConfig} />
-        <MetronomePanel bpm={bpm} isMetronomePlaying={isMetronomePlaying} toggleMetronome={toggleMetronome} updateBpm={updateBpm} />
-      </div>
 
       {/* 4. 悬浮音程映射图：支持自由拖拽，实时显示当前触发音符的音程关系 (Interval Relations) */}
       <div 
